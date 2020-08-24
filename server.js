@@ -30,7 +30,6 @@ app.use('/public', express.static(process.cwd() + '/public'));
 app.get('/', function(req, res){
   res.sendFile(process.cwd() + '/views/index.html');
 });
-
   
 // your first API endpoint... 
 app.get("/api/hello", function (req, res) {
@@ -46,31 +45,35 @@ const shortUrlSchema = new Schema({
 
 const ShortUrl = mongoose.model('ShortUrl', shortUrlSchema);
 
+const handleInvalidUrl = (res) => {
+  console.log(err);
+  res.json({"error":"invalid URL"});
+}
+
+const onSave = (res) => {
+  return (err, shortUrl) => {
+    if (err) {
+      handleInvalidUrl(res)
+      return;
+    }
+
+    dns.lookup(url.parse(shortUrl.original_url).hostname, (err) => {
+      if (err) {
+        handleInvalidUrl(res)
+        return;
+      }
+      res.json({"original_url": shortUrl.original_url,"short_url":shortUrl._id});
+
+    })
+  }
+}
+ 
 // your first API endpoint... 
 app.post("/api/shorturl/new", (req, res) => {
   const originalUrl = req.body.url
 
   const shortUrl = new ShortUrl({original_url: originalUrl})
-  shortUrl.save((err, data) => {
-    if (err) {
-      console.log(err);
-      res.json({"error":"invalid URL"});
-      return;
-    }
-
-    dns.lookup(url.parse(originalUrl).hostname, (err) => {
-      if (err) {
-        console.log(err);
-        res.json({"error":"invalid URL"});
-        return;
-      }
-      res.json({"original_url": shortUrl.original_url,"short_url":shortUrl._id});
-  
-    })
-
-  })
-
-
+  shortUrl.save(onSave(res));
 });
 
 app.get('/api/shorturl/:id', (req, res) => {
